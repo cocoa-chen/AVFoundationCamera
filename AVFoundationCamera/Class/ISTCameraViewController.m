@@ -104,10 +104,16 @@
 //拍照
 - (void)takePhoto:(UIButton *)btn
 {
-    [ISTCameraHelper captureStillImage];
-    [self performSelector:@selector(getImage) withObject:nil afterDelay:0.5];
+//    [ISTCameraHelper captureStillImage];
+//    [self performSelector:@selector(getImage) withObject:nil afterDelay:0.5];
+    [ISTCameraHelper captureStillImageWithBlock:^(UIImage *captureImage){
+        ISTViewPhotoViewController *viewPhotoVc = [[ISTViewPhotoViewController alloc] init];
+        viewPhotoVc.photoImage = captureImage;
+        [self.navigationController pushViewController:viewPhotoVc animated:YES];
+        [viewPhotoVc release];
+    }];
 }
-//获取图片
+//获取图片并跳转到下一界面
 - (void)getImage
 {
     ISTViewPhotoViewController *viewPhotoVc = [[ISTViewPhotoViewController alloc] init];

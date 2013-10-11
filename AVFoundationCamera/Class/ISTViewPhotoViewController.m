@@ -39,8 +39,14 @@
     [backBtn addTarget:self action:@selector(backToCamera) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:backBtn];
     //预览图片
-    NSLog(@"图片宽高%f,%f",_photoImage.size.width,_photoImage.size.height);
-    UIImageView *photoImageView = [[UIImageView alloc] initWithFrame:CGRectMake(20, 50, 280, _photoImage.size.height / _photoImage.size.width * 280)];
+//    NSLog(@"图片宽高%f,%f",_photoImage.size.width,_photoImage.size.height);
+    CGFloat photoHeight;
+    if (_photoImage.size.width == 0) {
+        photoHeight = 0;
+    }else{
+        photoHeight = _photoImage.size.height / _photoImage.size.width * 280;
+    }
+    UIImageView *photoImageView = [[UIImageView alloc] initWithFrame:CGRectMake(20, 50, 280, photoHeight)];
     photoImageView.image = _photoImage;
     [self.view addSubview:photoImageView];
     [photoImageView release];

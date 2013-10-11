@@ -9,6 +9,8 @@
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 
+typedef void (^CaptureImageBlock)(UIImage *);
+
 @interface ISTCameraHelper : NSObject
 <AVCaptureVideoDataOutputSampleBufferDelegate>
 {
@@ -16,12 +18,14 @@
     AVCaptureStillImageOutput *captureOutput;
     UIImage *image;
     AVCaptureVideoPreviewLayer *preview;
+    CaptureImageBlock captureBlock;
 }
 @property (retain) AVCaptureSession *session;
 @property (retain) AVCaptureOutput *captureOutput;
 @property (nonatomic,retain) AVCaptureDeviceInput *videoInput;
-@property (retain) UIImage *image;
+@property (nonatomic,retain) UIImage *image;
 @property (assign) AVCaptureVideoPreviewLayer *preview;
+@property (nonatomic,assign) BOOL isProcessingImage;
 
 /**
  *	启动相机取景
@@ -47,6 +51,12 @@
  *	拍照
  */
 + (void)captureStillImage;
+/**
+ *	带block的拍照
+ *
+ *	@param	block	block参数
+ */
++ (void)captureStillImageWithBlock:(CaptureImageBlock)block;
 /**
  *	翻转相机前/后摄像头
  *

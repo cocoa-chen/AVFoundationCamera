@@ -17,11 +17,14 @@
 @synthesize image;
 @synthesize preview;
 @synthesize videoInput;
+@synthesize isProcessingImage = _isProcessingImage;
 
 static ISTCameraHelper *sharedInstance = nil;
 
 - (void)initialize
 {
+    //正在处理生成图片为NO
+    self.isProcessingImage = NO;
     //1.创建会话层
     self.session = [[[AVCaptureSession alloc] init] autorelease];
     [self.session setSessionPreset:AVCaptureSessionPresetHigh];
@@ -70,6 +73,8 @@ static ISTCameraHelper *sharedInstance = nil;
 
 -(void)captureimage
 {
+    //将处理图片状态值置为YES
+    self.isProcessingImage = YES;
     //get connection
     AVCaptureConnection *videoConnection = nil;
     for (AVCaptureConnection *connection in captureOutput.connections) {
@@ -83,14 +88,17 @@ static ISTCameraHelper *sharedInstance = nil;
     }
     
     //get UIImage
+    __block ISTCameraHelper *objSelf = self;
     [captureOutput captureStillImageAsynchronouslyFromConnection:videoConnection completionHandler:
      ^(CMSampleBufferRef imageSampleBuffer, NSError *error) {
          if (imageSampleBuffer != NULL) {
-             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageSampleBuffer];             
-             if (image) {
-                 [image release],image = nil;
-             }
-             image = [[UIImage alloc] initWithData:imageData];
+             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageSampleBuffer];
+             NSLog(@"开始生成图片");
+             UIImage *tempImage = [[UIImage alloc] initWithData:imageData];
+             objSelf.image = tempImage;
+             [tempImage release];
+             //将处理图片状态值置为NO
+             objSelf.isProcessingImage = NO;
          }
 //         CFDictionaryRef exifAttachments =
 //         CMGetAttachment(imageSampleBuffer, kCGImagePropertyExifDictionary, NULL);
@@ -108,6 +116,39 @@ static ISTCameraHelper *sharedInstance = nil;
 //#endif
      }];
 }
+- (void)captureImage:(CaptureImageBlock)block{
+    //get connection
+    if (captureBlock){
+        Block_release(captureBlock);
+    }
+    captureBlock = Block_copy(block);
+    AVCaptureConnection *videoConnection = nil;
+    for (AVCaptureConnection *connection in captureOutput.connections) {
+        for (AVCaptureInputPort *port in [connection inputPorts]) {
+            if ([[port mediaType] isEqual:AVMediaTypeVideo] ) {
+                videoConnection = connection;
+                break;
+            }
+        }
+        if (videoConnection) { break; }
+    }
+    
+    //get UIImage
+    __block ISTCameraHelper *objSelf = self;
+    [captureOutput captureStillImageAsynchronouslyFromConnection:videoConnection completionHandler:
+     ^(CMSampleBufferRef imageSampleBuffer, NSError *error) {
+         if (imageSampleBuffer != NULL) {
+             NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageSampleBuffer];
+             NSLog(@"开始生成图片");
+             UIImage *tempImage = [[UIImage alloc] initWithData:imageData];
+             objSelf.image = tempImage;
+             [tempImage release];
+             //返回图片
+             objSelf->captureBlock(objSelf.image);
+         }
+     }];
+}
+
 - (AVCaptureDevice *) cameraWithPosition:(AVCaptureDevicePosition) position
 {
     NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
@@ -256,6 +297,7 @@ bail:
 
 - (void) dealloc
 {
+    Block_release(captureBlock);
     [[self session] stopRunning];
 	self.session = nil;
 	self.image = nil;
@@ -266,94 +308,94 @@ bail:
 
 + (id) sharedInstance // private
 {
-    @synchronized(self){
-        if (sharedInstance == nil) {
-            sharedInstance = [[self alloc] init];
-        }
-    }
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedInstance = [[ISTCameraHelper alloc] init];
+    });
     return sharedInstance;
 }
-+ (id)allocWithZone:(NSZone *)zone{
-    @synchronized(self){
-        if (sharedInstance == nil) {
-            sharedInstance = [super allocWithZone:zone];
-            return sharedInstance;
-        }
-    }
-    return nil;
-}
-- (id)copyWithZone:(NSZone *)zone{
-    return self;
-}
-
 + (void) startRunning
 {
-	[[[self sharedInstance] session] startRunning];
+	[[[ISTCameraHelper sharedInstance] session] startRunning];
 }
 
 + (void) stopRunning
 {
-	[[[self sharedInstance] session] stopRunning];
+	[[[ISTCameraHelper sharedInstance] session] stopRunning];
 }
 
 + (BOOL)toggleCamera
 {
-    return [[self sharedInstance] toggleCameraPosition];
+    return [[ISTCameraHelper sharedInstance] toggleCameraPosition];
 }
 
 + (UIImage *) image
 {
-	return [[self sharedInstance] image];
+    //判断图片状态状态值，如果为YES，则等待，避免因还未生成图片时取图片而造成的返回照片不正确的问题
+//    BOOL shouldWait = YES;
+//    while (shouldWait) {
+//        if (![[ISTCameraHelper sharedInstance] isProcessingImage]) {
+//            NSLog(@"照片组成完毕");
+//            shouldWait = NO;
+//        }
+//    }
+    NSLog(@"取图片");
+    return [[ISTCameraHelper sharedInstance] image];
 }
 
 + (void)captureStillImage
 {
-    [[self sharedInstance] captureimage];
+    [[ISTCameraHelper sharedInstance] captureimage];
+}
+
++ (void)captureStillImageWithBlock:(CaptureImageBlock)block
+{
+    [[ISTCameraHelper sharedInstance] captureImage:block];
 }
 
 + (void)embedPreviewInView: (UIView *) aView
 {
-    [[self sharedInstance] embedPreviewInView:aView];
+    [[ISTCameraHelper sharedInstance] embedPreviewInView:aView];
 }
 
 + (BOOL)isBackFacingCamera
 {
-    return [[self sharedInstance] isUseBackFacingCamera];
+    return [[ISTCameraHelper sharedInstance] isUseBackFacingCamera];
 }
 
 + (BOOL)isBackCameraSupportFlash
 {
-    return [[self sharedInstance] isBackCameraHasFlash];
+    return [[ISTCameraHelper sharedInstance] isBackCameraHasFlash];
 }
 
 + (BOOL)isBackCameraFlashSupportAutoMode
 {
-    return [[self sharedInstance] isFlashSupportAutoMode];
+    return [[ISTCameraHelper sharedInstance] isFlashSupportAutoMode];
 }
 
 + (BOOL)isBackCameraFlashSupportOnMode
 {
-    return [[self sharedInstance] isFlashSupportOnMode];
+    return [[ISTCameraHelper sharedInstance] isFlashSupportOnMode];
 }
 
 + (BOOL)isBackCameraFlashSupportOffMode
 {
-    return [[self sharedInstance] isFlashSupportOffMode];
+    return [[ISTCameraHelper sharedInstance] isFlashSupportOffMode];
 }
 
 + (void)changeBackCameraFlashModeToAuto
 {
-    [[self sharedInstance] changeFlashModeToAuto];
+    [[ISTCameraHelper sharedInstance] changeFlashModeToAuto];
 }
 
 + (void)changeBackCameraFlashModeToOn
 {
-    [[self sharedInstance] changeFlashModeToOn];
+    [[ISTCameraHelper sharedInstance] changeFlashModeToOn];
 }
 
 + (void)changeBackCameraFlashModeToOff
 {
-    [[self sharedInstance] changeFlashModeToOff];
+    [[ISTCameraHelper sharedInstance] changeFlashModeToOff];
 }
 
 @end
